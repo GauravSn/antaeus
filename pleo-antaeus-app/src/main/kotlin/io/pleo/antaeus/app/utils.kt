@@ -1,12 +1,15 @@
-
+import io.pleo.antaeus.core.external.CustomerNotificationProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import mu.KotlinLogging
 import java.math.BigDecimal
 import kotlin.random.Random
+
+private val logger = KotlinLogging.logger {}
 
 // This will create all schemas and setup initial data
 internal fun setupInitialData(dal: AntaeusDal) {
@@ -34,7 +37,16 @@ internal fun setupInitialData(dal: AntaeusDal) {
 internal fun getPaymentProvider(): PaymentProvider {
     return object : PaymentProvider {
         override fun charge(invoice: Invoice): Boolean {
-                return Random.nextBoolean()
+            return Random.nextBoolean()
+        }
+    }
+}
+
+// Customer notification provider mocked instance
+internal fun getCustomerNotificationProvider(): CustomerNotificationProvider {
+    return object : CustomerNotificationProvider {
+        override fun notify(customerId: Int, message: String) {
+            logger.info { "Message - $message sent to customer : $customerId" }
         }
     }
 }

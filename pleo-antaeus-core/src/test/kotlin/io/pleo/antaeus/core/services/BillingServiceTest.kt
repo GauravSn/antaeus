@@ -6,12 +6,14 @@ import io.mockk.verify
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
+import io.pleo.antaeus.core.external.CustomerNotificationProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency.EUR
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus.*
 import io.pleo.antaeus.models.Money
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
@@ -23,12 +25,19 @@ class BillingServiceTest {
         every { fetchInvoices(PENDING) }.returns(pendingInvoices)
     }
     private val paymentProvider = mockk<PaymentProvider>()
+    private val customerNotificationProvider = mockk<CustomerNotificationProvider>()
 
     private val invoiceService = InvoiceService(dal = dal)
     private val billingService = BillingService(
         invoiceService,
-        paymentProvider
+        paymentProvider,
+        customerNotificationProvider
     )
+
+    @BeforeEach
+    fun setup() {
+        every { customerNotificationProvider.notify(any(), any()) }.returns(Unit)
+    }
 
     @Test
     fun `must set invoice paid when payment success`() {
@@ -39,6 +48,7 @@ class BillingServiceTest {
 
         verify(exactly = 1, timeout = 1000) {
             invoiceService.updateStatus(1, PAID)
+            customerNotificationProvider.notify(1, "Your subscription has been renewed.")
         }
     }
 
@@ -51,6 +61,10 @@ class BillingServiceTest {
 
         verify(exactly = 1, timeout = 1000) {
             invoiceService.updateStatus(1, UNPAID)
+            customerNotificationProvider.notify(
+                1,
+                "Your subscription could not be renewed since payment was unsuccessful."
+            )
         }
     }
 

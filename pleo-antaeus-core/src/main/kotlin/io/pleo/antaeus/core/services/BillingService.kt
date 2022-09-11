@@ -4,6 +4,7 @@ import io.github.resilience4j.retry.Retry.decorateCheckedSupplier
 import io.github.resilience4j.retry.RetryConfig
 import io.github.resilience4j.retry.RetryRegistry
 import io.pleo.antaeus.core.exceptions.NetworkException
+import io.pleo.antaeus.core.external.CustomerNotificationProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus.*
@@ -24,7 +25,8 @@ private val retry = RetryRegistry.of(retryConfig).retry("payment-service-retry")
 
 class BillingService(
     private val invoiceService: InvoiceService,
-    private val paymentProvider: PaymentProvider
+    private val paymentProvider: PaymentProvider,
+    private val customerNotificationProvider: CustomerNotificationProvider
 ) {
 
     fun processInvoices() {
@@ -56,11 +58,19 @@ class BillingService(
     private fun handleSuccess(invoice: Invoice) {
         invoiceService.updateStatus(invoice.id, PAID)
         logger.info { "Payment for invoice - ${invoice.id} was successful." }
+        customerNotificationProvider.notify(
+            invoice.customerId,
+            "Your subscription has been renewed."
+        )
     }
 
     private fun handleUnpaid(invoice: Invoice) {
         invoiceService.updateStatus(invoice.id, UNPAID)
         logger.info { "Payment for invoice - ${invoice.id} failed, status set to UNPAID." }
+        customerNotificationProvider.notify(
+            invoice.customerId,
+            "Your subscription could not be renewed since payment was unsuccessful."
+        )
     }
 
     private fun handleFailure(th: Throwable, invoice: Invoice) {
