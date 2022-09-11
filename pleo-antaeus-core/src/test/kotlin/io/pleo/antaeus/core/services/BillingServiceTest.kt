@@ -6,9 +6,13 @@ import io.mockk.verify
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
 import io.pleo.antaeus.core.exceptions.NetworkException
+import io.pleo.antaeus.core.external.BillingCaseHandler
 import io.pleo.antaeus.core.external.CustomerNotificationProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
+import io.pleo.antaeus.models.BillingCaseCategory.CURRENCY_MISMATCH
+import io.pleo.antaeus.models.BillingCaseCategory.INVALID_CUSTOMER
+import io.pleo.antaeus.models.BillingCaseEvent
 import io.pleo.antaeus.models.Currency.EUR
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus.*
@@ -26,17 +30,20 @@ class BillingServiceTest {
     }
     private val paymentProvider = mockk<PaymentProvider>()
     private val customerNotificationProvider = mockk<CustomerNotificationProvider>()
+    private val billingCaseHandler = mockk<BillingCaseHandler>()
 
     private val invoiceService = InvoiceService(dal = dal)
     private val billingService = BillingService(
         invoiceService,
         paymentProvider,
-        customerNotificationProvider
+        customerNotificationProvider,
+        billingCaseHandler
     )
 
     @BeforeEach
     fun setup() {
         every { customerNotificationProvider.notify(any(), any()) }.returns(Unit)
+        every { billingCaseHandler.handle(any()) }.returns(Unit)
     }
 
     @Test
@@ -77,6 +84,7 @@ class BillingServiceTest {
 
         verify(exactly = 1, timeout = 1000) {
             invoiceService.updateStatus(1, FAILED)
+            billingCaseHandler.handle(BillingCaseEvent(1, INVALID_CUSTOMER))
         }
     }
 
@@ -89,6 +97,7 @@ class BillingServiceTest {
 
         verify(exactly = 1, timeout = 1000) {
             invoiceService.updateStatus(1, FAILED)
+            billingCaseHandler.handle(BillingCaseEvent(1, CURRENCY_MISMATCH))
         }
     }
 
