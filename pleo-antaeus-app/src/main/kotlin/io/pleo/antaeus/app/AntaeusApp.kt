@@ -72,6 +72,9 @@ fun main() {
         billingCaseHandler = devNotificationProvider
     )
 
+    // Scheduling billing job
+    BillingJobScheduler(billingService).schedule()
+
     // Create REST web service
     AntaeusRest(
         invoiceService = invoiceService,
