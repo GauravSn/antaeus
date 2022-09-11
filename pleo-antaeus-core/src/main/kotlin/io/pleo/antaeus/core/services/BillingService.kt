@@ -5,8 +5,10 @@ import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus.*
 import mu.KotlinLogging
+import java.util.concurrent.Executors
 
 private val logger = KotlinLogging.logger {}
+private val executor = Executors.newFixedThreadPool(10);
 
 class BillingService(
     private val invoiceService: InvoiceService,
@@ -17,7 +19,7 @@ class BillingService(
         invoiceService
             .fetchAll(PENDING)
             .forEach {
-                processInvoice(it)
+                executor.submit { processInvoice(it) }
             }
     }
 
