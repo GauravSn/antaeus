@@ -5,6 +5,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
 import io.pleo.antaeus.core.exceptions.CustomerNotFoundException
+import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency.EUR
@@ -74,6 +75,18 @@ class BillingServiceTest {
 
         verify(exactly = 1, timeout = 1000) {
             invoiceService.updateStatus(1, FAILED)
+        }
+    }
+
+    @Test
+    fun `must retry on network exception`() {
+        every { dal.updateStatus(1, FAILED) }.returns(Unit)
+        every { paymentProvider.charge(pendingInvoices[0]) }.throws(NetworkException())
+
+        billingService.processInvoices()
+
+        verify(exactly = 3, timeout = 4000) {
+            paymentProvider.charge(pendingInvoices[0])
         }
     }
 }
