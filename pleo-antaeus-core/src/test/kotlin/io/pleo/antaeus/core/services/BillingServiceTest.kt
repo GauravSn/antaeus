@@ -32,9 +32,8 @@ class BillingServiceTest {
     private val customerNotificationProvider = mockk<CustomerNotificationProvider>()
     private val billingCaseHandler = mockk<BillingCaseHandler>()
 
-    private val invoiceService = InvoiceService(dal = dal)
     private val billingService = BillingService(
-        invoiceService,
+        dal,
         paymentProvider,
         customerNotificationProvider,
         billingCaseHandler
@@ -54,7 +53,7 @@ class BillingServiceTest {
         billingService.processInvoices()
 
         verify(exactly = 1, timeout = 1000) {
-            invoiceService.updateStatus(1, PAID)
+            dal.updateStatus(1, PAID)
             customerNotificationProvider.notify(1, "Your subscription has been renewed.")
         }
     }
@@ -67,7 +66,7 @@ class BillingServiceTest {
         billingService.processInvoices()
 
         verify(exactly = 1, timeout = 1000) {
-            invoiceService.updateStatus(1, UNPAID)
+            dal.updateStatus(1, UNPAID)
             customerNotificationProvider.notify(
                 1,
                 "Your subscription could not be renewed since payment was unsuccessful."
@@ -83,7 +82,7 @@ class BillingServiceTest {
         billingService.processInvoices()
 
         verify(exactly = 1, timeout = 1000) {
-            invoiceService.updateStatus(1, FAILED)
+            dal.updateStatus(1, FAILED)
             billingCaseHandler.handle(BillingCaseEvent(1, INVALID_CUSTOMER))
         }
     }
@@ -96,7 +95,7 @@ class BillingServiceTest {
         billingService.processInvoices()
 
         verify(exactly = 1, timeout = 1000) {
-            invoiceService.updateStatus(1, FAILED)
+            dal.updateStatus(1, FAILED)
             billingCaseHandler.handle(BillingCaseEvent(1, CURRENCY_MISMATCH))
         }
     }

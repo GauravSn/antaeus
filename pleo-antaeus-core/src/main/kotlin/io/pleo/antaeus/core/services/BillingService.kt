@@ -12,6 +12,7 @@ import io.pleo.antaeus.core.exceptions.NetworkException
 import io.pleo.antaeus.core.external.BillingCaseHandler
 import io.pleo.antaeus.core.external.CustomerNotificationProvider
 import io.pleo.antaeus.core.external.PaymentProvider
+import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.BillingCaseCategory
 import io.pleo.antaeus.models.BillingCaseCategory.*
 import io.pleo.antaeus.models.BillingCaseEvent
@@ -41,15 +42,14 @@ private val rateLimiterConfig = RateLimiterConfig.custom()
 private val rateLimiter = RateLimiterRegistry.of(rateLimiterConfig).rateLimiter("payment-rate-limiter")
 
 class BillingService(
-    private val invoiceService: InvoiceService,
+    private val dal: AntaeusDal,
     private val paymentProvider: PaymentProvider,
     private val customerNotificationProvider: CustomerNotificationProvider,
     private val billingCaseHandler: BillingCaseHandler
 ) {
 
     fun processInvoices() {
-        invoiceService
-            .fetchAll(PENDING)
+        dal.fetchInvoices(PENDING)
             .forEach {
                 executor.submit { processInvoice(it) }
             }
@@ -76,7 +76,7 @@ class BillingService(
     }
 
     private fun handleSuccess(invoice: Invoice) {
-        invoiceService.updateStatus(invoice.id, PAID)
+        dal.updateStatus(invoice.id, PAID)
         logger.info { "Payment for invoice - ${invoice.id} was successful." }
         customerNotificationProvider.notify(
             invoice.customerId,
@@ -85,7 +85,7 @@ class BillingService(
     }
 
     private fun handleUnpaid(invoice: Invoice) {
-        invoiceService.updateStatus(invoice.id, UNPAID)
+        dal.updateStatus(invoice.id, UNPAID)
         logger.info { "Payment for invoice - ${invoice.id} failed, status set to UNPAID." }
         customerNotificationProvider.notify(
             invoice.customerId,
@@ -94,7 +94,7 @@ class BillingService(
     }
 
     private fun handleFailure(th: Throwable, invoice: Invoice) {
-        invoiceService.updateStatus(invoice.id, FAILED)
+        dal.updateStatus(invoice.id, FAILED)
         logger.error(th) { "Payment for invoice - ${invoice.id} failed." }
         billingCaseHandler.handle(BillingCaseEvent(invoice.id, getBillingCaseCategory(th)))
     }
