@@ -118,4 +118,4 @@ Happy hacking 😁!
 - **Scalability** - If we have to process millions of invoices monthly, we might need to scale and add multiple instances of this service. Still, there is one problem, if we keep the same logic to schedule pending invoices billing, we might process the same invoices numerous times since we would be fetching duplicate invoices in each instance to process. One way to solve this problem is to provide invoices for processing to each instance through a messaging queue like Kafka, where each member would be part of the same consumer group and receive different invoices to process and increase parallel processing.
 
 ## Challenge Time
-It took almost 6 hours spanning two days to complete this challenge.
+It took almost 6 hours spanning three days to complete this challenge.
