@@ -10,8 +10,7 @@ import io.pleo.antaeus.core.external.BillingCaseHandler
 import io.pleo.antaeus.core.external.CustomerNotificationProvider
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
-import io.pleo.antaeus.models.BillingCaseCategory.CURRENCY_MISMATCH
-import io.pleo.antaeus.models.BillingCaseCategory.INVALID_CUSTOMER
+import io.pleo.antaeus.models.BillingCaseCategory.*
 import io.pleo.antaeus.models.BillingCaseEvent
 import io.pleo.antaeus.models.Currency.EUR
 import io.pleo.antaeus.models.Invoice
@@ -19,6 +18,7 @@ import io.pleo.antaeus.models.InvoiceStatus.*
 import io.pleo.antaeus.models.Money
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.lang.RuntimeException
 import java.math.BigDecimal
 
 class BillingServiceTest {
@@ -109,6 +109,35 @@ class BillingServiceTest {
 
         verify(exactly = 3, timeout = 4000) {
             paymentProvider.charge(pendingInvoices[0])
+        }
+    }
+
+    @Test
+    fun `must be successful after retry`() {
+        every { dal.updateStatus(1, PAID) }.returns(Unit)
+        every { paymentProvider.charge(pendingInvoices[0]) }.throws(NetworkException()).andThen(true)
+
+        billingService.processInvoices()
+
+        verify(exactly = 2, timeout = 2000) {
+            paymentProvider.charge(pendingInvoices[0])
+        }
+        verify(exactly = 1, timeout = 1000) {
+            dal.updateStatus(1, PAID)
+            customerNotificationProvider.notify(1, "Your subscription has been renewed.")
+        }
+    }
+
+    @Test
+    fun `must fail on unknown exception`() {
+        every { dal.updateStatus(1, FAILED) }.returns(Unit)
+        every { paymentProvider.charge(pendingInvoices[0]) }.throws(RuntimeException())
+
+        billingService.processInvoices()
+
+        verify(exactly = 1, timeout = 1000) {
+            dal.updateStatus(1, FAILED)
+            billingCaseHandler.handle(BillingCaseEvent(1, UNKNOWN))
         }
     }
 }
