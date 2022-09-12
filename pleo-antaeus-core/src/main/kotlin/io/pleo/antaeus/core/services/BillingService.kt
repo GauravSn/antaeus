@@ -1,6 +1,9 @@
 package io.pleo.antaeus.core.services
 
-import io.github.resilience4j.retry.Retry.decorateCheckedSupplier
+import io.github.resilience4j.ratelimiter.RateLimiter
+import io.github.resilience4j.ratelimiter.RateLimiterConfig
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry
+import io.github.resilience4j.retry.Retry
 import io.github.resilience4j.retry.RetryConfig
 import io.github.resilience4j.retry.RetryRegistry
 import io.pleo.antaeus.core.exceptions.CurrencyMismatchException
@@ -27,7 +30,15 @@ private val retryConfig = RetryConfig.custom<Any>()
     .waitDuration(Duration.ofSeconds(1))
     .retryExceptions(NetworkException::class.java)
     .build()
-private val retry = RetryRegistry.of(retryConfig).retry("payment-service-retry")
+private val retry = RetryRegistry.of(retryConfig).retry("payment-retry")
+
+// Rate limiter to allow max 10 call per second
+private val rateLimiterConfig = RateLimiterConfig.custom()
+    .limitForPeriod(10)
+    .limitRefreshPeriod(Duration.ofSeconds(1))
+    .timeoutDuration(Duration.ofSeconds(5))
+    .build()
+private val rateLimiter = RateLimiterRegistry.of(rateLimiterConfig).rateLimiter("payment-rate-limiter")
 
 class BillingService(
     private val invoiceService: InvoiceService,
@@ -46,9 +57,11 @@ class BillingService(
 
     private fun processInvoice(invoice: Invoice) {
         try {
-            val isPaid = decorateCheckedSupplier(retry) {
-                logger.info { "Initiating payment for invoice - ${invoice.id}" }
-                paymentProvider.charge(invoice)
+            val isPaid = Retry.decorateCheckedSupplier(retry) {
+                RateLimiter.decorateCheckedSupplier(rateLimiter) {
+                    logger.info { "Initiating payment for invoice - ${invoice.id}" }
+                    paymentProvider.charge(invoice)
+                }.apply()
             }.apply()
 
             when (isPaid) {
@@ -82,7 +95,7 @@ class BillingService(
 
     private fun handleFailure(th: Throwable, invoice: Invoice) {
         invoiceService.updateStatus(invoice.id, FAILED)
-        logger.error { "Payment for invoice - ${invoice.id} failed." }
+        logger.error(th) { "Payment for invoice - ${invoice.id} failed." }
         billingCaseHandler.handle(BillingCaseEvent(invoice.id, getBillingCaseCategory(th)))
     }
 
