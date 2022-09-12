@@ -112,7 +112,7 @@ Happy hacking 😁!
   - If payment failed due to `CustomerNotFoundException`, we set invoice status to `FAILED` and send the billing case event to the external case management system with the category `INVALID_CUSTOMER`.
   - If payment failed due to `CurrencyMismatchException`, then we set invoice status to `FAILED` and send the billing case event to the external case management system with category `CURRENCY_MISMATCH`.
   - If payment failed due to `NetworkException`, we retry three times with a 1-second delay. Even after it dies, send mocked alert to the DevOps team.
-
+- Also, there is a REST endpoint (`/rest/v1/billings/trigger`) to trigger pending invoices billings manually. This can be useful when we need to process invoices adhoc-ly or need to integrate this feature with some other service.
 
 ## Few other thoughts
 - **Idempotency** - It is possible that the invoice payment was a success, but we could not get the response in time and receive `NetworkException`. In that case, we retry and perform double payments for the same invoice; this is a classic issue and can be solved using idempotency flow, where we send some unique identifier with the payment request as request key for the same invoice. The payment service hard checks the request key to check whether we are trying to process the same invoice again or not, if it is same request we get the same response as the first request else it is considered as new request.
